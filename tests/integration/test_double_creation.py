@@ -59,17 +59,24 @@ def test_get_owned_ids_works_after_double_spend(b, user_vk, user_sk):
     input_valid = b.get_owned_ids(user_vk).pop()
     tx_valid = b.create_transaction(user_vk, user_vk, input_valid, 'TRANSFER')
     tx_valid_signed = b.sign_transaction(tx_valid, user_sk)
-    b.write_transaction(tx_valid_signed)
 
+    # write the valid tx and wait for voting/block to catch up
+    b.write_transaction(tx_valid_signed)
     time.sleep(2)
+
+    # doesn't throw an exception
+    b.get_owned_ids(user_vk)
 
     # create another transaction with the same input
     tx_double_spend = b.create_transaction(user_vk, user_vk,
                                            input_valid, 'TRANSFER')
     tx_double_spend_signed = b.sign_transaction(tx_double_spend, user_sk)
-    with pytest.raises(exceptions.DoubleSpend) as excinfo:
-        b.validate_transaction(tx_double_spend_signed)
 
-    assert excinfo.value.args[0] == 'input `{}` was already spent' \
-        .format(input_valid)
+    # write the double spend tx
+    b.write_transaction(tx_double_spend_signed)
+    time.sleep(2)
+
+    # still doesn't throw an exception
+    b.get_owned_ids(user_vk)
+
     assert b.is_valid_transaction(tx_double_spend) is False
